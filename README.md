@@ -1,6 +1,6 @@
 # To-Do List App
 
-Aplicación web simple para gestionar tareas (To-Do List) creada con Node.js, Express y JavaScript. Permite agregar, editar, completar y eliminar tareas desde una interfaz moderna y responsiva.
+Aplicación web simple para gestionar tareas (To-Do List) creada con Node.js, Express y JavaScript. Permite agregar, editar, completar y eliminar tareas desde una interfaz moderna y responsiva. Realizada completamente con copilot.
 
 ## Características
 
