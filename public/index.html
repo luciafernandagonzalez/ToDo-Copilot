@@ -9,7 +9,14 @@
 <body>
     <h1>To-Do List</h1>
     <form id="taskForm">
-        <input type="text" id="taskTitle" placeholder="Nueva tarea..." required>
+        <input type="text" id="taskTitle" placeholder="Título de la tarea..." required>
+        <input type="text" id="taskDescription" placeholder="Descripción (opcional)">
+        <input type="date" id="taskDueDate" placeholder="Fecha límite (opcional)">
+        <select id="taskPriority">
+            <option value="Low">Baja</option>
+            <option value="Medium">Media</option>
+            <option value="High">Alta</option>
+        </select>
         <button type="submit">Agregar</button>
     </form>
     <ul id="taskList"></ul>
@@ -18,7 +25,18 @@
     <div id="editModal" class="modal">
         <div class="modal-content">
             <h2>Editar tarea</h2>
-            <input type="text" id="editInput" />
+            <input type="text" id="editTitle" placeholder="Título">
+            <input type="text" id="editDescription" placeholder="Descripción">
+            <input type="date" id="editDueDate" placeholder="Fecha límite">
+            <select id="editPriority">
+                <option value="Low">Baja</option>
+                <option value="Medium">Media</option>
+                <option value="High">Alta</option>
+            </select>
+            <select id="editStatus">
+                <option value="Pending">Pendiente</option>
+                <option value="Completed">Completada</option>
+            </select>
             <div class="modal-actions">
                 <button id="saveEdit">Guardar</button>
                 <button id="cancelEdit">Cancelar</button>
@@ -40,14 +58,22 @@
             list.innerHTML = '';
             tasks.forEach(task => {
                 const li = document.createElement('li');
-                li.className = task.completed ? 'completed' : '';
+                li.className = task.status === "Completed" ? 'completed' : '';
                 li.innerHTML = `
-                    <span>${task.title}</span>
-                    <button onclick="showEditModal(${task.id}, '${task.title}')">Editar</button>
-                    <button onclick="toggleComplete(${task.id}, ${!task.completed})">
-                        ${task.completed ? 'Desmarcar' : 'Completar'}
-                    </button>
-                    <button onclick="deleteTask(${task.id})">Eliminar</button>
+                    <span>
+                        <strong class="task-title">${task.title}</strong><br>
+                        ${task.description ? `<span class="field-label">Descripción:</span> <span class="field-value">${task.description}</span><br>` : ''}
+                        ${task.dueDate ? `<span class="field-label">Fecha límite:</span> <span class="field-value">${task.dueDate}</span><br>` : ''}
+                        <span class="field-label">Prioridad:</span> <span class="field-value priority-${task.priority}">${task.priority}</span><br>
+                        <span class="field-label">Estado:</span> <span class="field-value status-${task.status}">${task.status}</span>
+                    </span>
+                    <div class="button-group">
+                        <button onclick="showEditModal('${task}')">Editar</button>
+                        <button onclick="toggleComplete('${task.id}', '${task.status === 'Completed' ? 'Pending' : 'Completed'}')">
+                            ${task.status === 'Completed' ? 'Desmarcar' : 'Completar'}
+                        </button>
+                        <button onclick="deleteTask('${task.id}')">Eliminar</button>
+                    </div>
                 `;
                 list.appendChild(li);
             });
@@ -56,35 +82,46 @@
         document.getElementById('taskForm').onsubmit = async function(e) {
             e.preventDefault();
             const title = document.getElementById('taskTitle').value;
+            const description = document.getElementById('taskDescription').value;
+            const dueDate = document.getElementById('taskDueDate').value;
+            const priority = document.getElementById('taskPriority').value;
             await fetch('/tasks', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ title })
+                body: JSON.stringify({ title, description, dueDate, priority })
             });
             document.getElementById('taskTitle').value = '';
+            document.getElementById('taskDescription').value = '';
+            document.getElementById('taskDueDate').value = '';
+            document.getElementById('taskPriority').value = 'Low';
             fetchTasks();
         };
 
-        window.showEditModal = function(id, oldTitle) {
-            editingId = id;
-            const modal = document.getElementById('editModal');
-            document.getElementById('editInput').value = oldTitle;
-            modal.style.display = 'flex';
-            document.getElementById('editInput').focus();
+        window.showEditModal = function(task) {
+            editingId = task.id;
+            document.getElementById('editTitle').value = task.title;
+            document.getElementById('editDescription').value = task.description || '';
+            document.getElementById('editDueDate').value = task.dueDate || '';
+            document.getElementById('editPriority').value = task.priority || 'Low';
+            document.getElementById('editStatus').value = task.status || 'Pending';
+            document.getElementById('editModal').style.display = 'flex';
+            document.getElementById('editTitle').focus();
         };
 
         document.getElementById('saveEdit').onclick = async function() {
-            const newTitle = document.getElementById('editInput').value;
-            if (newTitle.trim() !== '') {
-                await fetch(`/tasks/${editingId}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ title: newTitle })
-                });
-                editingId = null;
-                document.getElementById('editModal').style.display = 'none';
-                fetchTasks();
-            }
+            const title = document.getElementById('editTitle').value;
+            const description = document.getElementById('editDescription').value;
+            const dueDate = document.getElementById('editDueDate').value;
+            const priority = document.getElementById('editPriority').value;
+            const status = document.getElementById('editStatus').value;
+            await fetch(`/tasks/${editingId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, description, dueDate, priority, status })
+            });
+            editingId = null;
+            document.getElementById('editModal').style.display = 'none';
+            fetchTasks();
         };
 
         document.getElementById('cancelEdit').onclick = function() {
@@ -92,11 +129,11 @@
             document.getElementById('editModal').style.display = 'none';
         };
 
-        window.toggleComplete = async function(id, completed) {
+        window.toggleComplete = async function(id, newStatus) {
             await fetch(`/tasks/${id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ completed })
+                body: JSON.stringify({ status: newStatus })
             });
             fetchTasks();
         };
@@ -106,7 +143,6 @@
             fetchTasks();
         };
 
-        // Cerrar modal con Escape
         window.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
                 document.getElementById('editModal').style.display = 'none';
@@ -116,4 +152,6 @@
 
         fetchTasks();
     </script>
+    <script src="/script.js"></script>
 </body>
+</html>
