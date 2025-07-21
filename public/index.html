@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="es">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<head>
+    <meta charset="UTF-8">
+    <title>To-Do List</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>To-Do List</h1>
+    <form id="taskForm">
+        <input type="text" id="taskTitle" placeholder="Nueva tarea..." required>
+        <button type="submit">Agregar</button>
+    </form>
+    <ul id="taskList"></ul>
+
+    <!-- Modal para editar tarea -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <h2>Editar tarea</h2>
+            <input type="text" id="editInput" />
+            <div class="modal-actions">
+                <button id="saveEdit">Guardar</button>
+                <button id="cancelEdit">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let editingId = null;
+
+        async function fetchTasks() {
+            const res = await fetch('/tasks');
+            const tasks = await res.json();
+            renderTasks(tasks);
+        }
+
+        function renderTasks(tasks) {
+            const list = document.getElementById('taskList');
+            list.innerHTML = '';
+            tasks.forEach(task => {
+                const li = document.createElement('li');
+                li.className = task.completed ? 'completed' : '';
+                li.innerHTML = `
+                    <span>${task.title}</span>
+                    <button onclick="showEditModal(${task.id}, '${task.title}')">Editar</button>
+                    <button onclick="toggleComplete(${task.id}, ${!task.completed})">
+                        ${task.completed ? 'Desmarcar' : 'Completar'}
+                    </button>
+                    <button onclick="deleteTask(${task.id})">Eliminar</button>
+                `;
+                list.appendChild(li);
+            });
+        }
+
+        document.getElementById('taskForm').onsubmit = async function(e) {
+            e.preventDefault();
+            const title = document.getElementById('taskTitle').value;
+            await fetch('/tasks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title })
+            });
+            document.getElementById('taskTitle').value = '';
+            fetchTasks();
+        };
+
+        window.showEditModal = function(id, oldTitle) {
+            editingId = id;
+            const modal = document.getElementById('editModal');
+            document.getElementById('editInput').value = oldTitle;
+            modal.style.display = 'flex';
+            document.getElementById('editInput').focus();
+        };
+
+        document.getElementById('saveEdit').onclick = async function() {
+            const newTitle = document.getElementById('editInput').value;
+            if (newTitle.trim() !== '') {
+                await fetch(`/tasks/${editingId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title: newTitle })
+                });
+                editingId = null;
+                document.getElementById('editModal').style.display = 'none';
+                fetchTasks();
+            }
+        };
+
+        document.getElementById('cancelEdit').onclick = function() {
+            editingId = null;
+            document.getElementById('editModal').style.display = 'none';
+        };
+
+        window.toggleComplete = async function(id, completed) {
+            await fetch(`/tasks/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ completed })
+            });
+            fetchTasks();
+        };
+
+        window.deleteTask = async function(id) {
+            await fetch(`/tasks/${id}`, { method: 'DELETE' });
+            fetchTasks();
+        };
+
+        // Cerrar modal con Escape
+        window.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                document.getElementById('editModal').style.display = 'none';
+                editingId = null;
+            }
+        });
+
+        fetchTasks();
+    </script>
+</body>
